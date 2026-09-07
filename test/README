@@ -1,11 +1,7 @@
+With the device completely powered off:
 
-This directory is intended for PlatformIO Test Runner and project tests.
-
-Unit Testing is a software testing method by which individual units of
-source code, sets of one or more MCU program modules together with associated
-control data, usage procedures, and operating procedures, are tested to
-determine whether they are fit for use. Unit testing finds problems early
-in the development cycle.
-
-More information about PlatformIO Unit Testing:
-- https://docs.platformio.org/en/latest/advanced/unit-testing/index.html
+Use continuity mode between each button terminal and the labelled GND hole.
+One side will have continuity to GND—do not use that side.
+The other side is the button signal, GPIO42.
+Solder WS80 TX to that non-GND button terminal.
+Connect WS80 GND to the labelled GND hole.
