@@ -26,7 +26,7 @@ Adafruit_BME280 bme;
 float           temperature, humidity, pressure;
 
 /*** E-paper setup ***/
-// #include "sh_epd.h"
+ #include "sh_epd.h"
 
 /*** GPS setup ***/
 #include "sh_gps.h"
