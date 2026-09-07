@@ -38,11 +38,37 @@ Important for your modified T-Echo: your Program button/GPIO42 is connected to t
 [LoRaWAN] New interval: 3 minute(s)
 
 
-<img width="3021" height="2864" alt="IMG_7492" src="https://github.com/user-attachments/assets/0e8a2dea-191b-4b74-92fe-1bb8323722c9" />
+{
+  "id":  "KWind_2026",
+  "model": "T-ECHO_WS8xx_LoRa",
+  "name": "KWind_T-ECHO_GPS",
+  "wind_dir_deg": 251,
+  "wind_avg_m_s": 1.34,
+  "wind_max_m_s": 1.9,
+  "wind_min_m_s": null,
+  "humidity": 65,
+  "battery_V": 3.02,
+  "temperature_C": 25.7,
+  "rain_mm": 0,
+  "light_lux": 0,
+  "uv_index": 0,
+  "lora_board_mV": 4887,
+  "gps_valid": true,
+  "latitude": 47.505394,
+  "longitude": 8.74721,
+  "gps_satellites": 0,
+  "gps_hdop": 7,
+  "error": ""
+}
 
 
 
 
-<img width="885" height="1479" alt="IMG_7489" src="https://github.com/user-attachments/assets/4e67a758-a283-4410-9102-58542f6d2ea8" />
+
+<img width="3024" height="4032" alt="IMG_7494" src="https://github.com/user-attachments/assets/2ff580ff-6689-45ef-8b84-e66b9c983474" />
+
+<img width="3024" height="4032" alt="IMG_7495" src="https://github.com/user-attachments/assets/e5af0f84-a8b3-4987-87a1-0437e3e215d6" />
+
+
 
 
