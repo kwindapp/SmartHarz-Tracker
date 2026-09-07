@@ -31,7 +31,7 @@ Important for your modified T-Echo: your Program button/GPIO42 is connected to t
 
 
 
-[LoRaWAN] Downlink FPort 1 (HEX): 02.  AQ==
+[LoRaWAN] Downlink FPort 1 (HEX): 02.  AQ== Default
 [LoRaWAN] New interval: 2 minute(s)    Ag==
 
 [LoRaWAN] Downlink FPort 1 (HEX): 03

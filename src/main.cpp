@@ -54,7 +54,7 @@ static const uint8_t APP_KEY[16] = {
 static constexpr uint8_t UPLINK_PORT = 2;
 
 static constexpr uint32_t DEFAULT_SEND_INTERVAL_MS =
-    60000UL;
+   120000UL;
 
 static uint32_t sendIntervalMs =
     DEFAULT_SEND_INTERVAL_MS;
