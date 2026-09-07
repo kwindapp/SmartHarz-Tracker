@@ -10,7 +10,7 @@ Downlinks
 T-Echo button functions:
 
 Button/action	Function
-Reset button — press once	Restart/power on
+Reset button — press once	Restart/power on.        ON Top by Antenna 
 Reset button — press twice quickly	Enter bootloader/DFU mode
 Program button — press once	Change display page
 Program button — press twice	Send an ad-hoc ping
