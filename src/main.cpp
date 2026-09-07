@@ -899,6 +899,8 @@ static void updateDisplay()
         return;
     }
 
+    constexpr float MPS_TO_KNOTS = 1.94384449f;
+
     display.setFullWindow();
     display.firstPage();
 
@@ -907,127 +909,208 @@ static void updateDisplay()
         display.fillScreen(GxEPD_WHITE);
         display.setTextColor(GxEPD_BLACK);
 
-        // Header
-        display.fillRect(0, 0, 200, 25, GxEPD_BLACK);
+        // =============================================================
+        // HEADER
+        // =============================================================
+        display.fillRect(0, 0, 200, 31, GxEPD_BLACK);
+
         display.setTextColor(GxEPD_WHITE);
-        display.setFont(&FreeMonoBold12pt7b);
-        display.setCursor(50, 19);
+        display.setFont(&FreeMonoBold18pt7b);
+        display.setCursor(43, 25);
         display.print("KWIND");
 
-        // Main wind value
+        // =============================================================
+        // MAIN WIND VALUE
+        // =============================================================
         display.setTextColor(GxEPD_BLACK);
         display.setFont(&FreeMonoBold18pt7b);
-        display.setCursor(5, 61);
+        display.setCursor(5, 68);
 
         if (ws80.valid)
         {
-            const float average =
+            const float averageMps =
                 windStats.count > 0
                     ? windStats.averageWind()
                     : ws80.wind;
 
-            display.print(average, 1);
+            display.print(
+                averageMps * MPS_TO_KNOTS,
+                1
+            );
         }
         else
         {
             display.print("--.-");
         }
 
+        display.setFont(&FreeMonoBold12pt7b);
+        display.setCursor(150, 67);
+        display.print("kt"); 
+ // =============================================================
+// GUST AND DIRECTION BOXES
+// =============================================================
+display.drawRoundRect(
+    3,
+    74,
+    95,
+    42,
+    5,
+    GxEPD_BLACK
+);
+
+display.drawRoundRect(
+    102,
+    74,
+    95,
+    42,
+    5,
+    GxEPD_BLACK
+);
+
+// Small bold labels
+display.setFont(&FreeMonoBold9pt7b);
+
+display.setCursor(9, 88);
+display.print("GUST");
+
+display.setCursor(108, 88);
+display.print("DIR");
+
+// =============================================================
+// LARGE BOLD GUST VALUE
+// =============================================================
+display.setFont(&FreeMonoBold12pt7b);
+display.setCursor(8, 110);
+
+if (ws80.valid)
+{
+    const float gustMps =
+        windStats.count > 0
+            ? windStats.maximumGust
+            : ws80.gust;
+
+    const float gustKnots =
+        gustMps * MPS_TO_KNOTS;
+
+    display.print(gustKnots, 1);
+}
+else
+{
+    display.print("--.-");
+}
+
+// Smaller unit beside large gust value
+display.setFont(&FreeMonoBold9pt7b);
+display.setCursor(68, 110);
+display.print("kt");
+
+// =============================================================
+// LARGE BOLD DIRECTION VALUE
+// =============================================================
+display.setFont(&FreeMonoBold12pt7b);
+display.setCursor(107, 110);
+
+if (ws80.valid)
+{
+    display.print(ws80.direction);
+}
+else
+{
+    display.print("---");
+}
+
+// Smaller degree symbol
+display.setFont(&FreeMonoBold9pt7b);
+display.setCursor(174, 110);
+display.print("o");
+        // =============================================================
+        // GPS COORDINATES — BOLD
+        // =============================================================
         display.setFont(&FreeMonoBold9pt7b);
-        display.setCursor(137, 60);
-        display.print("m/s");
 
-        // Gust and direction boxes
-        display.drawRoundRect(3, 69, 95, 37, 5, GxEPD_BLACK);
-        display.drawRoundRect(102, 69, 95, 37, 5, GxEPD_BLACK);
-
-        display.setFont(&FreeMono9pt7b);
-        display.setCursor(10, 83);
-        display.print("GUST");
-        display.setCursor(109, 83);
-        display.print("DIR");
-
-        display.setFont(&FreeMonoBold9pt7b);
-        display.setCursor(10, 101);
-
-        if (ws80.valid)
-        {
-            const float gust =
-                windStats.count > 0
-                    ? windStats.maximumGust
-                    : ws80.gust;
-
-            display.print(gust, 1);
-            display.print(" m/s");
-        }
-        else
-        {
-            display.print("--.-");
-        }
-
-        display.setCursor(109, 101);
-
-        if (ws80.valid)
-        {
-            display.print(ws80.direction);
-            display.print(" deg");
-        }
-        else
-        {
-            display.print("---");
-        }
-
-        // Coordinates
-        display.setFont(nullptr);
-        display.setTextSize(1);
-        display.setCursor(5, 119);
+        display.setCursor(4, 126);
         display.print("LAT ");
 
         if (gpsFix.valid)
         {
-            display.print(gpsFix.latitude, 6);
+            display.print(gpsFix.latitude, 5);
         }
         else
         {
-            display.print("waiting for GPS");
+            display.print("WAIT");
         }
 
-        display.setCursor(5, 131);
+        display.setCursor(4, 144);
         display.print("LON ");
 
         if (gpsFix.valid)
         {
-            display.print(gpsFix.longitude, 6);
+            display.print(gpsFix.longitude, 5);
         }
         else
         {
-            display.print("waiting for GPS");
+            display.print("WAIT");
         }
 
-        display.drawFastHLine(3, 139, 194, GxEPD_BLACK);
+        display.drawFastHLine(
+            3,
+            150,
+            194,
+            GxEPD_BLACK
+        );
 
-        // Connection status
+        // =============================================================
+        // LORAWAN AND GPS STATUS — BOLD
+        // =============================================================
         display.setFont(&FreeMonoBold9pt7b);
-        display.setCursor(5, 155);
-        display.print(lorawanJoined ? "LORA OK" : "LORA OFF");
 
-        display.setCursor(108, 155);
-        display.print(gpsFix.valid ? "GPS OK" : "GPS WAIT");
+        display.setCursor(4, 166);
 
-        // Bottom information
-        display.setFont(nullptr);
-        display.setTextSize(1);
-        display.setCursor(5, 172);
-        display.print("SAT ");
+        if (lorawanJoined)
+        {
+            display.print("LORA OK");
+        }
+        else
+        {
+            display.print("LORA OFF");
+        }
+
+        display.setCursor(108, 166);
+
+        if (gpsFix.valid)
+        {
+            display.print("GPS OK");
+        }
+        else
+        {
+            display.print("GPS WAIT");
+        }
+
+        // =============================================================
+        // SATELLITES AND SEND INTERVAL — BOLD
+        // =============================================================
+        display.setCursor(4, 182);
+        display.print("S:");
         display.print(gpsFix.satellites);
-        display.print("   SEND ");
-        display.print(sendIntervalMs / 60000UL);
-        display.print(" min");
 
-        display.setCursor(5, 187);
-        display.print("BAT ");
+        display.setCursor(82, 182);
+        display.print("TX:");
+
+        display.print(
+            sendIntervalMs / 60000UL
+        );
+
+        display.print("min");
+
+        // =============================================================
+        // BATTERY AND DOWNLINK — BOLD
+        // =============================================================
+        display.setCursor(4, 198);
         display.print(readBoardBatteryMv());
-        display.print("mV   DL ");
+        display.print("mV");
+
+        display.setCursor(105, 198);
+        display.print("DL:");
 
         if (lastDownlinkLength > 0)
         {
@@ -1038,12 +1121,11 @@ static void updateDisplay()
         }
         else
         {
-            display.print("none");
+            display.print("--");
         }
     }
     while (display.nextPage());
 
-    // Put the panel into low-power mode after every refresh.
     display.hibernate();
 }
 
