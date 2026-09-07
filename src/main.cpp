@@ -23,6 +23,11 @@
 #include <SPI.h>
 #include <RadioLib.h>
 #include <TinyGPSPlus.h>
+#include <GxEPD2_BW.h>
+#include <Fonts/FreeMono9pt7b.h>
+#include <Fonts/FreeMonoBold9pt7b.h>
+#include <Fonts/FreeMonoBold12pt7b.h>
+#include <Fonts/FreeMonoBold18pt7b.h>
 #include <math.h>
 
 #include "t-echo.h"
@@ -48,8 +53,11 @@ static const uint8_t APP_KEY[16] = {
 
 static constexpr uint8_t UPLINK_PORT = 2;
 
-static constexpr uint32_t SEND_INTERVAL_MS =
+static constexpr uint32_t DEFAULT_SEND_INTERVAL_MS =
     60000UL;
+
+static uint32_t sendIntervalMs =
+    DEFAULT_SEND_INTERVAL_MS;
 
 static constexpr uint32_t SENSOR_STALE_MS =
     30000UL;
@@ -76,6 +84,25 @@ static constexpr uint32_t GPS_BAUD =
 SPIClass* radioSpi = nullptr;
 SX1262* radio = nullptr;
 LoRaWANNode* lorawan = nullptr;
+
+// T-Echo 1.54-inch 200 x 200 e-paper display.
+SPIClass* displaySpi = nullptr;
+
+GxEPD2_BW<
+    GxEPD2_154_D67,
+    GxEPD2_154_D67::HEIGHT
+> display(
+    GxEPD2_154_D67(
+        EPD_CS,
+        EPD_DC,
+        EPD_RST,
+        EPD_BUSY
+    )
+);
+
+static bool displayReady = false;
+static uint8_t lastDownlinkPort = 0;
+static size_t lastDownlinkLength = 0;
 
 // =============================================================================
 // GPS
@@ -862,6 +889,260 @@ static void buildPayload(
 }
 
 // =============================================================================
+// E-PAPER DISPLAY
+// =============================================================================
+
+static void updateDisplay()
+{
+    if (!displayReady)
+    {
+        return;
+    }
+
+    display.setFullWindow();
+    display.firstPage();
+
+    do
+    {
+        display.fillScreen(GxEPD_WHITE);
+        display.setTextColor(GxEPD_BLACK);
+
+        // Header
+        display.fillRect(0, 0, 200, 25, GxEPD_BLACK);
+        display.setTextColor(GxEPD_WHITE);
+        display.setFont(&FreeMonoBold12pt7b);
+        display.setCursor(50, 19);
+        display.print("KWIND");
+
+        // Main wind value
+        display.setTextColor(GxEPD_BLACK);
+        display.setFont(&FreeMonoBold18pt7b);
+        display.setCursor(5, 61);
+
+        if (ws80.valid)
+        {
+            const float average =
+                windStats.count > 0
+                    ? windStats.averageWind()
+                    : ws80.wind;
+
+            display.print(average, 1);
+        }
+        else
+        {
+            display.print("--.-");
+        }
+
+        display.setFont(&FreeMonoBold9pt7b);
+        display.setCursor(137, 60);
+        display.print("m/s");
+
+        // Gust and direction boxes
+        display.drawRoundRect(3, 69, 95, 37, 5, GxEPD_BLACK);
+        display.drawRoundRect(102, 69, 95, 37, 5, GxEPD_BLACK);
+
+        display.setFont(&FreeMono9pt7b);
+        display.setCursor(10, 83);
+        display.print("GUST");
+        display.setCursor(109, 83);
+        display.print("DIR");
+
+        display.setFont(&FreeMonoBold9pt7b);
+        display.setCursor(10, 101);
+
+        if (ws80.valid)
+        {
+            const float gust =
+                windStats.count > 0
+                    ? windStats.maximumGust
+                    : ws80.gust;
+
+            display.print(gust, 1);
+            display.print(" m/s");
+        }
+        else
+        {
+            display.print("--.-");
+        }
+
+        display.setCursor(109, 101);
+
+        if (ws80.valid)
+        {
+            display.print(ws80.direction);
+            display.print(" deg");
+        }
+        else
+        {
+            display.print("---");
+        }
+
+        // Coordinates
+        display.setFont(nullptr);
+        display.setTextSize(1);
+        display.setCursor(5, 119);
+        display.print("LAT ");
+
+        if (gpsFix.valid)
+        {
+            display.print(gpsFix.latitude, 6);
+        }
+        else
+        {
+            display.print("waiting for GPS");
+        }
+
+        display.setCursor(5, 131);
+        display.print("LON ");
+
+        if (gpsFix.valid)
+        {
+            display.print(gpsFix.longitude, 6);
+        }
+        else
+        {
+            display.print("waiting for GPS");
+        }
+
+        display.drawFastHLine(3, 139, 194, GxEPD_BLACK);
+
+        // Connection status
+        display.setFont(&FreeMonoBold9pt7b);
+        display.setCursor(5, 155);
+        display.print(lorawanJoined ? "LORA OK" : "LORA OFF");
+
+        display.setCursor(108, 155);
+        display.print(gpsFix.valid ? "GPS OK" : "GPS WAIT");
+
+        // Bottom information
+        display.setFont(nullptr);
+        display.setTextSize(1);
+        display.setCursor(5, 172);
+        display.print("SAT ");
+        display.print(gpsFix.satellites);
+        display.print("   SEND ");
+        display.print(sendIntervalMs / 60000UL);
+        display.print(" min");
+
+        display.setCursor(5, 187);
+        display.print("BAT ");
+        display.print(readBoardBatteryMv());
+        display.print("mV   DL ");
+
+        if (lastDownlinkLength > 0)
+        {
+            display.print("F");
+            display.print(lastDownlinkPort);
+            display.print("/");
+            display.print(lastDownlinkLength);
+        }
+        else
+        {
+            display.print("none");
+        }
+    }
+    while (display.nextPage());
+
+    // Put the panel into low-power mode after every refresh.
+    display.hibernate();
+}
+
+static void initializeDisplay()
+{
+    pinMode(EPD_BACKLIGHT, OUTPUT);
+    digitalWrite(EPD_BACKLIGHT, LOW);
+
+    displaySpi = new SPIClass(
+        NRF_SPIM2,
+        EPD_MISO,
+        EPD_SCLK,
+        EPD_MOSI
+    );
+
+    displaySpi->begin();
+
+    display.epd2.selectSPI(
+        *displaySpi,
+        SPISettings(
+            4000000,
+            MSBFIRST,
+            SPI_MODE0
+        )
+    );
+
+    display.init(0, true, 10, false);
+    display.setRotation(3);
+    displayReady = true;
+    updateDisplay();
+}
+
+// =============================================================================
+// DOWNLINK
+// =============================================================================
+
+static void processDownlink(
+    const uint8_t* data,
+    size_t length,
+    uint8_t port
+)
+{
+    lastDownlinkPort = port;
+    lastDownlinkLength = length;
+
+    SERIAL_MON.print("[LoRaWAN] Downlink FPort ");
+    SERIAL_MON.print(port);
+    SERIAL_MON.print(" (HEX): ");
+
+    for (size_t i = 0; i < length; i++)
+    {
+        if (data[i] < 0x10)
+        {
+            SERIAL_MON.print('0');
+        }
+
+        SERIAL_MON.print(data[i], HEX);
+    }
+
+    SERIAL_MON.println();
+
+    // Supported interval commands:
+    //   02       -> two-minute interval
+    //   01 02    -> command 0x01, two-minute interval
+    uint8_t minutes = 0;
+
+    if (length == 1)
+    {
+        minutes = data[0];
+    }
+    else if (length >= 2 && data[0] == 0x01)
+    {
+        minutes = data[1];
+    }
+
+    if (minutes >= 1 && minutes <= 60)
+    {
+        sendIntervalMs =
+            static_cast<uint32_t>(minutes) *
+            60000UL;
+
+        lastSendMs = millis();
+
+        SERIAL_MON.print(
+            "[LoRaWAN] New interval: "
+        );
+        SERIAL_MON.print(minutes);
+        SERIAL_MON.println(" minute(s)");
+    }
+    else if (length > 0)
+    {
+        SERIAL_MON.println(
+            "[LoRaWAN] Downlink received but command is invalid"
+        );
+    }
+
+}
+
+// =============================================================================
 // LORAWAN
 // =============================================================================
 
@@ -1048,12 +1329,21 @@ static bool sendPayload()
 
     SERIAL_MON.println();
 
+    uint8_t downlink[64] = {0};
+    size_t downlinkLength = sizeof(downlink);
+    LoRaWANEvent_t uplinkEvent = {};
+    LoRaWANEvent_t downlinkEvent = {};
+
     const int16_t state =
         lorawan->sendReceive(
             payload,
             sizeof(payload),
             UPLINK_PORT,
-            false
+            downlink,
+            &downlinkLength,
+            false,
+            &uplinkEvent,
+            &downlinkEvent
         );
 
     SERIAL_MON.print(
@@ -1070,6 +1360,12 @@ static bool sendPayload()
             SERIAL_MON.println(
                 "[LoRaWAN] Downlink received"
             );
+
+            processDownlink(
+                downlink,
+                downlinkLength,
+                downlinkEvent.fPort
+            );
         }
         else
         {
@@ -1077,6 +1373,8 @@ static bool sendPayload()
                 "[LoRaWAN] Uplink successful"
             );
         }
+
+        updateDisplay();
 
         return true;
     }
@@ -1292,7 +1590,9 @@ void setup()
     // SCL/GPIO27 is unused UART TX.
     //
     // Do not start Wire/I2C.
-    Serial1.setPins(42, 2);
+    // RX is the user-button signal. TX is unused; GPIO7 is used so
+    // the UART does not conflict with the e-paper RESET pin (GPIO2).
+    Serial1.setPins(42, 7);
 
    Serial1.begin(115200);
 
@@ -1300,9 +1600,23 @@ void setup()
         "[WS80] Serial1 started at 115200"
     );
 
-   SERIAL_MON.println(
-    "[WS80] TX -> user button GPIO42"
-);
+    SERIAL_MON.println(
+        "[WS80] TX -> user button GPIO42"
+    );
+
+    // -------------------------------------------------------------------------
+    // E-PAPER DISPLAY
+    // -------------------------------------------------------------------------
+
+    SERIAL_MON.println(
+        "[Display] Initializing e-paper..."
+    );
+
+    initializeDisplay();
+
+    SERIAL_MON.println(
+        "[Display] E-paper ready"
+    );
 
     // -------------------------------------------------------------------------
     // LORAWAN
@@ -1319,6 +1633,8 @@ void setup()
             "[LoRaWAN] Fatal radio error"
         );
     }
+
+    updateDisplay();
 
     lastJoinAttemptMs = millis();
     lastSendMs = millis();
@@ -1355,6 +1671,7 @@ void loop()
         if (lorawanJoined)
         {
             lastSendMs = millis();
+            updateDisplay();
         }
     }
 
@@ -1362,7 +1679,7 @@ void loop()
     if (lorawan != nullptr &&
         lorawanJoined &&
         now - lastSendMs >=
-            SEND_INTERVAL_MS)
+            sendIntervalMs)
     {
         lastSendMs = now;
 
