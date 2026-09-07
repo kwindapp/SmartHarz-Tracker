@@ -18,7 +18,7 @@
 #include "sh_board.h"
 
 /*** LoRa setup ***/
-// #include "sh_lora.h"
+ #include "sh_lora.h"
 
 /*** BME280 setup ***/
 #include "sh_bme280.h"
